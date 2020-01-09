@@ -138,17 +138,20 @@ while ( $timersql.Elapsed.TotalSeconds -lt $Timeout )  # Loop while time remains
 
 }
 
-# Remove the server name from the result set so that it's easier to work with in Power BI
-# Regex Quick Reference: 
-# https://docs.microsoft.com/en-us/dotnet/standard/base-types/regular-expression-language-quick-reference
+<#
+Remove the server name from the result set so that it's easier to work with in Power BI
+Regex Quick Reference: 
+https://docs.microsoft.com/en-us/dotnet/standard/base-types/regular-expression-language-quick-reference
 
-# Example: "Task ID","Event Date Time (UTC)","Performance Counter","Value"
-#          "48808","12/10/2019 6:06:36 AM","\\ec2amaz-u8hdq2f\memory\page faults/sec","129.892176504284"
-
+Example: 
+"Task ID","Event Date Time (UTC)","Performance Counter","Value"
+          "48808","12/10/2019 6:06:36 AM","\\ec2amaz-u8hdq2f\memory\page faults/sec","129.89"
+Result:   "48808","12/10/2019 6:06:36 AM","memory\page faults/sec","129.89"
+#>
 ((Get-Content -path "$($perfmon_outfile)" -Raw) -replace "\\{2}\w+\-\w+\\",'') | `
 Set-Content -Path "$($perfmon_outfile)"
 
-# Result:  "48808","12/10/2019 6:06:36 AM","memory\page faults/sec","129.892176504284"
+
 
 # That's it!
 Write-Host "Go to the file $($perfmon_outfile) to see the results."
