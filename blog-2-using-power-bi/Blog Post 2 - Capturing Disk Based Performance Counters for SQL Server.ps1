@@ -147,6 +147,7 @@ Example:
 "Task ID","Event Date Time (UTC)","Performance Counter","Value"
           "48808","12/10/2019 6:06:36 AM","\\ec2amaz-u8hdq2f\memory\page faults/sec","129.89"
 Result:   "48808","12/10/2019 6:06:36 AM","memory\page faults/sec","129.89"
+This pattern works for AWS EC2 instances because the have a hyphen in the server name
 #>
 ((Get-Content -path "$($perfmon_outfile)" -Raw) -replace "\\{2}\w+\-\w+\\",'') | `
 Set-Content -Path "$($perfmon_outfile)"
