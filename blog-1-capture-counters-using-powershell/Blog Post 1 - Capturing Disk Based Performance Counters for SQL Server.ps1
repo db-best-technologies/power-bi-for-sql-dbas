@@ -7,17 +7,17 @@ Description:
                 current performance of a SQL Server instance needed to optimize EBS volumes for similar performance
                 with lower storage costs.
 
-                You can use this script to run for a specific length of time or wait for a semephore file in an S3 bucket
+                You can use this script to run for a specific length of time or wait for a semaphore file in an S3 bucket
                 to complete the processing of the performance counter data.
 #>
 
 ####################################
 # 1. Setup the variables for the run
 ####################################
-$Task = "Trial_1"   # Unique identifier for the test run. Used as part of the output file name for the results.
+$Task = "Blog-B1"   # Unique identifier for the test run. Used as part of the output file name for the results.
 $perfmon_outfile = "C:\Temp\Task-$($Task)-PerfMon-Capture.csv"  # Name for the output file.
 
-# Specify the number of seconds to colect the data and how often to check
+# Specify the number of seconds to collect the data and how often to check
 $Timeout = 600      # Defines the number of seconds to capture the counters. Ex. 600 = 10 mins, 3600 = 1 hr, 28800 = 8 hr
 $CheckEvery = 60    # Defines the number of seconds to wait before checking again
 
@@ -29,7 +29,7 @@ $Counters = @(
 # Processor
   "\Processor(_Total)\% Processor Time"     # CPU usage provides a good way to identify patterns to investigate.
 , "\Processor(*)\% Processor Time"          # This is helpful to see what is going on with individual vCPU trends.
-, "\Processor(_total)\% Privileged Time"    # % time on kernal operations. If value is high, check AWS for EC2 driver patches.
+, "\Processor(_total)\% Privileged Time"    # % time on kernel operations. If value is high, check AWS for EC2 driver patches.
 , "\Processor(_total)\% User Time"          # % time spent on applications like SQL Server.
 
 # \SQLServer:Workload Group Stats
@@ -38,7 +38,7 @@ $Counters = @(
 # Memory Counter Categories
 
 # - Memory
-, "\Memory\Available Kbytes"    # The Kbytes counter aligns nicely woth SQL Server's (KB) scale.
+, "\Memory\Available Kbytes"    # The Kbytes counter aligns nicely with SQL Server's (KB) scale.
 , "\Memory\Committed Bytes"     # If Committed bytes is greater than physical memory, then more RAM will help.
 
 # - Paging File
@@ -56,7 +56,7 @@ $Counters = @(
 # IOPS counters - Reported as the average of the interval where the interval is greater than 1 second.
 , "\LogicalDisk(_Total)\Disk Reads/sec"          # Read operations where SQL Server has to load data into buffer pool
 , "\LogicalDisk(_Total)\Disk Writes/sec"         # Write operations where SQL Server has to harden data to disk
-, "\LogicalDisk(_Total)\Disk Transfers/sec"      # Tranfers (AKA IOPS) is approximately the sum of the Read/sec and Writes/sec
+, "\LogicalDisk(_Total)\Disk Transfers/sec"      # Transfers (AKA IOPS) is approximately the sum of the Read/sec and Writes/sec
 
 # Throughput counters - Bytes/sec - Reported as the average of the interval where the interval is greater than 1 second.
 , "\LogicalDisk(_Total)\Disk Read Bytes/sec"     # Read throughput
@@ -67,12 +67,12 @@ $Counters = @(
 * to see the block sizes SQL Server is using.
 , "\LogicalDisk(_Total)\Avg. Disk Bytes/Read"    # Read IO block size
 , "\LogicalDisk(_Total)\Avg. Disk Bytes/Write"   # Write IO block size
-, "\LogicalDisk(_Total)\Avg. Disk Bytes/Transfer"# Raed + Write IO block size
+, "\LogicalDisk(_Total)\Avg. Disk Bytes/Transfer"# Read + Write IO block size
 
 # Latency counter - Avg. Disk sec/Transfer represents IO latency.
 # This really isn't needed for the optimization, but it does verify volume configuration.
 , "\LogicalDisk(_Total)\Avg. Disk sec/Transfer" # For gp2 drives, this value is generally around .001 sec (1 ms) or less.
-                                                # SQL Seerver sys.dm_io_virtual_file_stats calls this io_stall_read/write
+                                                # SQL Server sys.dm_io_virtual_file_stats calls this io_stall_read/write
 
 # Physical counters - We collect the same counters as the LogicalDisk, but the values are reported
 # by drive letter. Same comments above apply.
@@ -121,7 +121,7 @@ while ( $timersql.Elapsed.TotalSeconds -lt $Timeout )  # Loop while time remains
 {
     Write-Host "Time remaining = $( $Timeout - $timersql.Elapsed.TotalSeconds )"
     # Time to sleep based on the value for $CheckEvery in seconds.
-    # The wait is done here to make sure that the inital performance counters are captured.
+    # The wait is done here to make sure that the initial performance counters are captured.
     Start-Sleep -Seconds $CheckEvery
 
     # The wait is over, get the next set of performance counters

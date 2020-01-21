@@ -1,5 +1,5 @@
 <#
-Title:          Blog Post 1 - Capturing Disk Based Performance Counters for SQL Server
+Title:          Blog Post 2 - Capturing Disk Based Performance Counters for SQL Server
 Author:         Bill Ramos, DB Best Technologies
 Published:      01/09/2019
 Description:
@@ -91,6 +91,39 @@ $Counters = @(
 #                        move the database log files to another volume.
 , "\SQLServer:Databases(*)\Log Flushes/sec"          # Shows Write IOPS for all database log files.
 , "\SQLServer:Databases(*)\Log Bytes Flushed/sec"    # Shows Write Bytes/sec for all database log files.
+<#
+"48876","12/18/2019 11:28:13 PM","\sqlserver:latches\latch waits/sec","929.576555461546"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:buffer manager\buffer cache hit ratio","99.9973728744913"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:buffer manager\page lookups/sec","1827332.11143944"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:buffer manager\page reads/sec","376.049412892854"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:buffer manager\page writes/sec","80156.5325683795"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:buffer manager\background writer pages/sec","74129.7406479211"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:buffer manager\page life expectancy","2865"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:databases (_Total)\transactions/sec","21310.8002391514"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:databases (_Total)\log flushes/sec","5125.67351349967"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:databases (_Total)\log bytes flushed/sec","37188374.5524162"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:databases (_Total)\log flush waits/sec","13591.7859606752"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:databases (_Total)\log flush wait time","86894.4179265155"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:databases (_Total)\write transactions/sec","13021.7110528323"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:locks (_Total)\lock timeouts/sec","354.046521712953"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:locks (_Total)\number of deadlocks/sec","0"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:locks (_Total)\lock waits/sec","208.027334791792"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:locks (_Total)\lock wait time (ms)","7091.93187984901"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:locks (_Total)\average wait time (ms)","34.0913461538462"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:latches\latch waits/sec","2095.27531917694"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:latches\average latch wait time (ms)","24.2264745610086"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:latches\total latch wait time (ms)","53814.0711689516"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:sql statistics\batch requests/sec","18807.471301729"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:workload group stats(default)\cpu usage %","34.6432135728543"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:workload group stats(default)\cpu effective %","97.1488542942103"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:workload group stats(default)\cpu delayed %","1.01671656686627"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:workload group stats(default)\cpu violated %","0"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:workload group stats(default)\queued requests","0"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:workload group stats(default)\active requests","130"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:workload group stats(default)\requests completed/sec","21281"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:workload group stats(default)\max request cpu time (ms)","11694"
+"48876","12/19/2019 12:14:08 AM","\sqlserver:workload group stats(default)\blocked tasks","5"
+#>
 
 )
 
