@@ -1,4 +1,4 @@
-"Task","Mode","RampupStartTime","TranStartTime","TranEndTime","VirtualUser","TPM","NOPM"
+"Task","Mode","Rampup Start Time","Transaction Start Time","Transaction End Time","Virtual Users","TPM","NOPM"
 "Blog-B1","TPCC","1/7/2020 8:01:32 PM","1/7/2020 8:03:36 PM","1/7/2020 8:06:45 PM","3","53319","11591"
 "Blog-B1","TPCC","1/7/2020 8:10:48 PM","1/7/2020 8:12:51 PM","1/7/2020 8:15:59 PM","5","61684","13366"
 "Blog-B1","TPCC","1/7/2020 8:20:05 PM","1/7/2020 8:22:08 PM","1/7/2020 8:25:14 PM","8","66804","14516"

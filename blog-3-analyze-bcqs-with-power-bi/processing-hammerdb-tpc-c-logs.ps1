@@ -26,10 +26,8 @@ Param (
 )
 # End parameters for Get-HammerDB-DateTime
 Process{
-    $Separator = "@ "
-    $PossibleDate = $TimeStampLine.Split($Separator,2)[1]
-    $DateParts = $PossibleDate.Split(" ")
-    $LocalTime = [DateTime]"$($DateParts[1]) $($DateParts[2]) $($DateParts[5]) $($DateParts[3])"
+    $LineParts = $TimeStampLine.Split(" ")
+    $LocalTime = [DateTime]"$($LineParts[4]) $($LineParts[5]) $($LineParts[8]) $($LineParts[6])"
     Return( 
          "$($LocalTime.ToUniversalTime().ToString('d')) $( $LocalTime.ToUniversalTime().ToString('T'))"
 #        $LocalTime.ToUniversalTime()
@@ -40,7 +38,7 @@ Process{
 # Quick test
 $qt = Get-HammerDB-DateTime("Timestamp 1 @ Tue Jan 07 12:01:32 PST 2020")
 Write-Host $qt
-# Expected result with UTC time zone: "1/7/2020 8:00:39 PM"
+# Expected result with UTC time zone: "1/7/2020 8:01:32 PM"
 
 Function Get-HammerDB-Results{
 <#
@@ -71,9 +69,7 @@ The function returns an array of three values for Virtual Users, TPM, NOPM value
     $vUser = "Vuser 1:144 Active Virtual Users configured"
     $TPML = "Vuser 1:TEST RESULT : System achieved 78844 SQL Server TPM at 16637 NOPM"
     $TPMResultsArray = Get-HammerDB-Results -VuserLine $vUser -TPMLine $TPML
-# Display results from the array
-    for ( $index = 0; $index -lt $TPMResultsArray.count; $index++)
-        {"Item [$($index)] = {0}" -f $TPMResultsArray[$index]}
+    Write-Host $TPMResultsArray      # Expect 144 78844 16637
 
 ##############################################
 # 2. Setup the global variables for the script
@@ -93,77 +89,79 @@ Foreach ($sw in $searchWords)
     Get-Childitem -Path $path -Recurse -include "*.log" | 
     Select-String -Pattern "$sw" -Context 1,2 | 
     ForEach-Object { 
-    @([pscustomobject] @{
-     "Task" = $Task
-     "FileName" = $_.Path
-     "Mode" = $mode
-     "VirtualUser" = $_.Line
-     "TPM" = $_.Context.PostContext[1]
-     "EndTime" = Get-HammerDB-DateTime($_.Context.PreContext[0])
-     } )
+        @([pscustomobject] @{
+            "Task" = $Task
+            "FileName" = $_.Path
+            "Mode" = $mode
+            "VirtualUser" = $_.Line
+            "TPM" = $_.Context.PostContext[1]
+            "EndTime" = Get-HammerDB-DateTime($_.Context.PreContext[0])
+        } )
     } | Export-Csv -Path $path\HammerDBResults_1.csv -NoTypeInformation 
 }
 $searchWords = 'Vuser 1:Beginning rampup time'
 Foreach ($sw in $searchWords)
 {
     Get-Childitem -Path $path -Recurse -include "*.log" | 
-    Select-String -Pattern "$sw" -Context 1,0 |ForEach-Object { 
-    @([pscustomobject] @{
-     "FileName" = $_.Path   
-     "StartTime" = Get-HammerDB-DateTime($_.Context.PreContext[0])
-     } ) 
+    Select-String -Pattern "$sw" -Context 1,0 |
+    ForEach-Object { 
+        @([pscustomobject] @{
+            "FileName" = $_.Path   
+            "StartTime" = Get-HammerDB-DateTime($_.Context.PreContext[0])
+        } ) 
     } | Export-Csv -Path $path\HammerDBResults_2.csv -NoTypeInformation 
 }
 $searchWords = 'Vuser 1:Rampup complete, Taking start Transaction Count'
 Foreach ($sw in $searchWords)
 {
     Get-Childitem -Path $path -Recurse -include "*.log" | 
-    Select-String -Pattern "$sw" -Context 1,0 |ForEach-Object { 
-    @([pscustomobject] @{
-     "FileName" = $_.Path   
-     "TranStartTime" = Get-HammerDB-DateTime($_.Context.PreContext[0])
-     } ) 
+    Select-String -Pattern "$sw" -Context 1,0 |
+    ForEach-Object { 
+        @([pscustomobject] @{
+            "FileName" = $_.Path   
+            "TranStartTime" = Get-HammerDB-DateTime($_.Context.PreContext[0])
+        } ) 
     } | Export-Csv -Path $path\HammerDBResults_3.csv -NoTypeInformation 
 }
 $CSV1 = Import-Csv -Path 'C:\Temp\HammerDBResults_1.csv' -Delimiter ','
 $CSV2 = Import-Csv -Path 'C:\Temp\HammerDBResults_2.csv' -Delimiter ','
 
 $InterResult = Foreach($Item1 in $CSV1){
-            Foreach($item2 in $CSV2){ 
-            If($Item1.FileName -eq $item2.FileName){
-                        [PSCustomObject]@{
-                            Task = $Item1.Task
-		                    FileName = $Item1.FileName
-		                    Mode = $Item1.Mode
-                            RampupStartTime = $Item2.StartTime
-		                    TranEndTime = $Item1.EndTime
-		                    VirtualUser = $Item1.VirtualUser
-		                    TPM = $Item1.TPM
-                            }
-	                    } 
-                    }
-                }
+    Foreach($item2 in $CSV2){ 
+        If($Item1.FileName -eq $item2.FileName){
+            @([PSCustomObject] @{
+                "Task" = $Item1.Task
+		        "FileName" = $Item1.FileName
+		        "Mode" = $Item1.Mode
+                "RampupStartTime" = $Item2.StartTime
+		        "TranEndTime" = $Item1.EndTime
+		        "VirtualUser" = $Item1.VirtualUser
+		        "TPM" = $Item1.TPM
+            } )
+	    } 
+    }
+}
 $InterResult | Export-Csv -Path 'C:\Temp\InterResult.csv' -NoTypeInformation 
 
 $CSV3 = Import-Csv -Path 'C:\Temp\HammerDBResults_3.csv' -Delimiter ','
 $CSV4 = Import-Csv -Path 'C:\Temp\InterResult.csv' -Delimiter ','
 
 $Result = Foreach($Item1 in $CSV4){
-            Foreach($Item2 in $CSV3){ 
-            If($Item1.FileName -eq $item2.FileName){
-                        $Result_Values = Get-HammerDB-Results -VuserLine $Item1.VirtualUser -TPMLine $Item1.TPM
-                        [PSCustomObject]@{
-                            Task = $Item1.Task
-		                    Mode = $Item1.Mode
-                            RampupStartTime = $item1.RampupStartTime
-                            TranStartTime = $item2.TranStartTime
-		                    TranEndTime = $Item1.TranEndTime
-		                    VirtualUser = $Result_Values[0]
-                            TPM = $Result_Values[1]
-                            NOPM = $Result_Values[2]
-                            }
-	                    } 
-                    }
-                }
+    Foreach($Item2 in $CSV3){ 
+        If($Item1.FileName -eq $item2.FileName){
+            $Result_Values = Get-HammerDB-Results -VuserLine $Item1.VirtualUser -TPMLine $Item1.TPM
+            @([PSCustomObject]@{
+                "Task" = $Item1.Task
+		        "Mode" = $Item1.Mode
+                "Rampup Start Time" = $item1.RampupStartTime
+                "Transaction Start Time" = $item2.TranStartTime
+		        "Transaction End Time" = $Item1.TranEndTime
+		        "Virtual Users" = $Result_Values[0]
+                "TPM" = $Result_Values[1]
+                "NOPM" = $Result_Values[2]
+            } )
+	    } 
+    }
+}
 $Result | Export-Csv -Path $FinalResult -NoTypeInformation 
 
