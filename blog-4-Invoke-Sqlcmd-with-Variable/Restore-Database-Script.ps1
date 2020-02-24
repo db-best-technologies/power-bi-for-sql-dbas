@@ -24,41 +24,30 @@ $SqlcmdParameters = @{
     Verbose = $true
     Variable = $SqlcmdVariables
 }
+
+
 Invoke-Sqlcmd @SqlcmdParameters
 
-$SqlcmdParameters.Query = "SELECT DB_NAME() AS [`$(DBName)]"
+# Delete the Query key value with Remove method
+$SqlcmdParameters.Remove("Query")
+
+# Add the Inputfile key value pair with the Add Method
+$SqlcmdParameters.Add('InputFile', '.\Restore-Database-Sqlcmd.sql')
+
+# Sanity check
+$SqlcmdParameters
+
+# Updating a parameter value
+$SqlcmdParameters.Verbose = $false
+Write-Host $SqlcmdParameters.Verbose
+
+Set-Location -Path .\blog-4-Invoke-Sqlcmd-with-Variable
 Invoke-Sqlcmd @SqlcmdParameters
 
-$SqlcmdParameters["Database"] = $Benchmark
-Invoke-Sqlcmd @SqlcmdParameters
-
-$SqlcmdParameters["Username"] = "sa"
-$SqlcmdParameters["Password"] = "Poop"
-Invoke-Sqlcmd @SqlcmdParameters
-$SqlcmdParameters.Remove("Username")
-$SqlcmdParameters.Remove("Password")
-Write-Host @SqlcmdParameters
-
-# CSV file with the sql user name, string_encrypted_password, and key
-# located in file C:\TEMP\secret.csv.
-$SecretsCSV = Import-Csv -Path 'C:\Temp\Secret.csv' -Delimiter ','
-if ($null -ne $SecretsCSV){
-    Write-Host "C:\Temp\Secret.csv loaded OK, so use the -Username -Password parameters for Invoke-Sqlcmd"
-    $Key = Invoke-Expression $SecretsCSV.Key | Invoke-Expression
-    $RevivedSecureString = $SecretsCSV.EncryptedPassword | ConvertTo-SecureString -Key $Key
-    $Password = (New-Object PSCredential "sa",$RevivedSecureString).GetNetworkCredential().Password
-
-    $SqlcmdParameters.Username = $SecretsCSV.SQLUser
-    $SqlcmdParameters.Password = $Password
-}
-Invoke-Sqlcmd @SqlcmdParameters
-Remove-Variable  -Name SecretsCSV, Password, Key, RevivedSecureString
-$SqlcmdParameters.Remove("Username")
-$SqlcmdParameters.Remove("Password")
-
-
-
-Remove-Variable -Name OriginalPassword, SecretsCSV, Key, Encrypted, RevivedSecureString
+# Query sys.master_files to results
+$SqlcmdParameters.Remove("InputFile")
+$SqlcmdParameters.Add("Database", "master")
+$SqlcmdParameters.Add("Query", "SELECT name as [Logical Name], physical_name AS [File Location] FROM sys.master_files WHERE name LIKE ('$($Benchmark)%')")
 
 
 

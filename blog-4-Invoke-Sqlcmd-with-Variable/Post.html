@@ -1,0 +1,205 @@
+I recently needed to use PowerShell to call a T-SQL script using <a href="https://docs.microsoft.com/en-us/powershell/module/sqlserver/invoke-sqlcmd?view=sqlserver-ps" target="_blank" rel="noopener">Invoke-Sqlcmd</a> with the -Variable parameter the names of backup files based on different conditions. Rather than add the conditions into the SQL script, I wanted to make the SQL script as generic as possible, and use SQLCMD variables for the different scenarios. In this blog, I'll show how to use the <a href="https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_arrays?view=powershell-7#the-array-sub-expression-operator" target="_blank" rel="noopener">array sub-expression operator</a> and splatting with has tables to build the parameters needed for the [cci lang="powershell"]Invoke-Sqlcmd[/cci] cmdlet.
+
+In Example 3 for the <a href="https://docs.microsoft.com/en-us/powershell/module/sqlserver/invoke-sqlcmd?view=sqlserver-ps#examples" target="_blank" rel="noopener">documentation for Invoke_Sqlcmd</a>, it shows using a string array and then a -Query SELECT statement like this:
+
+[cc lang="powershell" escaped="true" nowrap="false"]
+$StringArray = "MYVAR1='String1'", "MYVAR2='String2'"
+Invoke-Sqlcmd -Query "SELECT `$(MYVAR1) AS Var1, `$(MYVAR2) AS Var2" -Variable $StringArray
+[/cc]
+
+The problem with this example is the use of the ` backtick, backquote, or grave accent character in the SQL statement. This leads to the impression that you should do the same in your SQL script.
+
+[cc lang="tsql" escaped="true" nowrap="false"]
+SELECT `$(MYVAR1) AS Var1, `$(MYVAR2) AS Var2
+[/cc]
+
+The TSQL interpreter doesn't know what to do with the backtick character and throws an error! It turns out that backtick is an <a href="https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_special_characters?view=powershell-7" target="_blank" rel="noopener">escape character for PowerShell</a> so that the use of  [cci lang="powershell"]$(MYVAR1)[/cci] doesn't throw an error. The pesky backtick character is not just for line continuations.
+<h1>Using a hash table to pass variables for Invoke-Sqlcmd</h1>
+The PowerShell documentation has a great definition of a feature called <a href="https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_splatting?view=powershell-7#long-description" target="_blank" rel="noopener">Splatting</a>.
+<blockquote>Splatting is a method of passing a collection of parameter values to a command as a unit. PowerShell associates each value in the collection with a command parameter. Splatted parameter values are stored in named splatting variables, which look like standard variables, but begin with an At symbol (@) instead of a dollar sign ($). The At symbol tells PowerShell that you are passing a collection of values, instead of a single value.</blockquote>
+In my scenario, I like to use <a href="https://www.hammerdb.com/docs/ch03s03.html" target="_blank" rel="noopener">HammerDB with the TPC-C benchmark</a> for practicing monitoring and troubleshooting scenarios on my local machine and cloud platforms like AWS and Azure. On my local machine or cloud snapshot drive, I have a folder in the root directory that contains several different sizes and modifications for comparing results to a baseline. For example:
+
+[cc lang="text" escaped="true" nowrap="false"]
+C:\Backup\  contains files with name patterns like
+TPCC_HammerDB3.3_10.bak
+TPCC_HammerDB3.3_1000.bak
+TPCC_HammerDB3.3_2000.bak
+TPCC_NewIndexTest1_10.bak
+TPCC_NewIndexTest1_1000.bak
+TPCC_NewIndexTest1_2000.bak
+[/cc]
+
+These smaller databases only use one file for the data and log files. In addition, I like to sometimes test with different volume drive configurations for the data and log files. To help in validating which test scenario I'm running, I name the data files using the same root file name. For example:
+
+[cc lang="tsql" escaped="true" nowrap="false"]
+RESTORE DATABASE [tpcc]
+FROM DISK = N'G:\BACKUP\TPCC_HammerDB3.3_10.bak'
+WITH FILE = 1,
+MOVE N'tpcc' TO N'E:\DATA\TPCC_HammerDB3.3_10.mdf',
+MOVE N'tpcc_log'
+TO N'L:\LOG\TPCC_HammerDB3.3_10.ldf',
+NOUNLOAD, STATS = 5, MAXTRANSFERSIZE = 4194304;
+GO
+[/cc]
+
+The actual restore database script with SQLCMD variables looks like this.
+
+[cc lang="tsql" escaped="true" nowrap="false"]
+:on error exit
+
+-- Drop the database if it already exists
+USE master
+GO
+IF (EXISTS (SELECT name FROM master.dbo.sysdatabases WHERE (name = '$(DBName)')))
+	BEGIN
+		EXEC msdb.dbo.sp_delete_database_backuphistory @database_name = N'$(DBName)';
+		ALTER DATABASE [$(DBName)] SET  SINGLE_USER WITH ROLLBACK IMMEDIATE;
+		DROP DATABASE [$(DBName)];
+	END
+GO
+
+RESTORE DATABASE [$(DBName)] 
+        FROM  
+            DISK = N'$(BackupPath)' 
+        WITH  FILE = 1
+            , MOVE N'$(DBName)' TO N'$(DataDrv)'  
+            , MOVE N'$(DBName)_log' TO N'$(LogDrv)'  
+            , NOUNLOAD
+            , STATS = 5
+            , MAXTRANSFERSIZE = 4194304;
+GO
+[/cc]
+
+In my PowerShell script used to call the restore database script, I want to build the variables for the SQLCMD parts based on individual test parameters. Here is what the test parameters look like for the PowerShell script.
+
+[cc lang="powershell" escaped="true" nowrap="false"]
+param
+(
+[string]$Cloud = "local", # Use aws, azure, gcp, or local
+[string]$Benchmark = "tpcc", # Also DB name
+[string]$Scenario = "HammerDB3.3",
+[string]$BackupDrv = "G",
+[string]$DataDrv = "E",
+[string]$LogDrv = "L",
+[string]$Warehouses = "10",
+[string]$sql_instance_name = "BILL\SQLEXPRESS"
+)
+[/cc]
+
+The next step is to create an array of the SQLCMD "variable names = values" pairs to define the database name, backup file path, data drive, and log drive file names.
+
+[cc lang="powershell" escaped="true" nowrap="false"]
+$SqlcmdVariables= @(
+"DBName=$Benchmark",
+"BackupPath=$($BackupDrv):\Backup\$($Benchmark)_$($Scenario)_$($Warehouses).bak",
+"DataDrv=$($DataDrv):\DATA\$($Benchmark)_$($Scenario)_$($Warehouses).mdf",
+"LogDrv=$($LogDrv):\LOG\$($Benchmark)_$($Scenario)_$($Warehouses).ldf"
+)
+[/cc]
+
+Here is what the result looks like by running the script at this point by typing $SqlcmdVariables.
+
+[cc lang="text" escaped="true" nowrap="true" highlight="1"]
+PS C:\GitHub\dbt-power-bi-for-sql-dbas> $SqlcmdVariables
+DBName=tpcc
+BackupPath=G:\Backup\tpcc_HammerDB3.3_10.bak
+DataDrv=E:\DATA\tpcc_HammerDB3.3_10.mdf
+LogDrv=L:\LOG\tpcc_HammerDB3.3_10.ldf
+[/cc]
+
+Now, I'll create a hash table with all the parameters I want to use for the Invoke-Sqlcmd cmdlet. I'm going to use a modified example of Example 3 from the Invoke-Sqlcmd web page with the Query parameter.
+
+[cc lang="powershell" escaped="true" nowrap="false"]
+$SqlcmdParameters = @{
+ServerInstance = $sql_instance_name
+QueryTimeout = 0
+Query = "SELECT '`$(DBName)' AS DBName, '`$(BackupPath)' AS BackupPath, '`$(DataDrv)' AS DataDrv, '`$(LogDrv)' AS LogDrv"
+Verbose = $true
+Variable = $SqlcmdVariables
+}
+[/cc]
+Notice that I used the [cci lang="powershell"]$SqlcmdVariables[/cci] array as the value for the Variable key for the hash table. By typing in the PowerShell command [cci lang="powershell"]$SqlParameters[/cci], you'll notice a different looking output than [cci lang="powershell"]$SqlcmdVariables[/cci].
+
+[cc lang="text" escaped="true" nowrap="true" highlight="1"]
+PS C:\GitHub\dbt-power-bi-for-sql-dbas> $SqlcmdParameters
+
+Name                           Value
+----                           -----
+Query                          SELECT '$(DBName)' AS DBName, '$(BackupPath)' AS BackupPath, '$(DataDrv)' AS DataDrv, '$(LogDrv)' AS LogDrv
+ServerInstance                 BILL\SQLEXPRESS
+Variable                       {DBName=tpcc, BackupPath=G:\Backup\tpcc_HammerDB3.3_10.bak, DataDrv=E:\DATA\tpcc_HammerDB3.3_10.mdf, LogDrv=L:\LOG\tpcc_HammerDB3.3_10.ldf}
+Verbose                        True
+QueryTimeout                   0
+[/cc]
+
+Because $SqlcmdParameters is a hash table, the result comes back as a table with the key name and value. I can now use the hash table by taking advantage of the splat feature in PowerShell to test variable substitution for the test query.
+
+[cc lang="powershell" escaped="true" nowrap="false"]
+Invoke-Sqlcmd @SqlcmdParameters
+[/cc]
+
+The output should look like this.
+
+[cc lang="text" escaped="true" nowrap="true"]
+DBName BackupPath                        DataDrv                         LogDrv
+------ ----------                        -------                         ------
+tpcc   G:\Backup\tpcc_HammerDB3.3_10.bak E:\DATA\tpcc_HammerDB3.3_10.mdf L:\LOG\tpcc_HammerDB3.3_10.ldf
+[/cc]
+
+Now, it's time to try out the call by replacing the -Query parameter with the -Inputput parameter to the restore script. 
+
+I hope you are following along right now. Here is the beauty of using hash tables as your test out your PowerShell script.
+
+I can use Powershell's hash table features to delete the -Query parameter and add the -InputFile parameter like this:
+[cc lang="powershell" escaped="true" nowrap="false"]
+# Delete the Query key value with Remove method
+$SqlcmdParameters.Remove("Query")
+
+# Add the Inputfile key value pair with the Add Method
+$SqlcmdParameters.Add('InputFile', '.\Restore-Database-Sqlcmd.sql')
+
+# Sanity check
+$SqlcmdParameters
+[/cc]
+
+You should now see the updated hash table that looks like this.
+[cc lang="text" escaped="true" nowrap="true" highlight="1"]
+PS C:\GitHub\dbt-power-bi-for-sql-dbas> $SqlcmdParameters
+
+Name                           Value
+----                           -----
+ServerInstance                 BILL\SQLEXPRESS
+Variable                       {DBName=tpcc, BackupPath=G:\Backup\tpcc_HammerDB3.3_10.bak, DataDrv=E:\DATA\tpcc_HammerDB3.3_10.mdf, LogDrv=L:\LOG\tpcc_HammerDB3.3_10.ldf}
+InputFile                      .\Restore-Database-Sqlcmd.sql
+Verbose                        True
+QueryTimeout                   0
+
+[/cc]
+
+It's time for the big test to actually do the restore!
+
+[cc lang="powershell" escaped="true" nowrap="false"]
+Invoke-Sqlcmd @SqlcmdParameters
+[/cc]
+
+Let's check out the results.
+
+[cc lang="powershell" escaped="true" nowrap="false"]
+# Query sys.master_files to results
+$SqlcmdParameters.Remove("InputFile")
+$SqlcmdParameters.Add("Database", "master")
+$SqlcmdParameters.Add("Query", "SELECT name as [Logical Name], physical_name AS [File Location] FROM sys.master_files WHERE name LIKE ('tpcc%')")
+Invoke-Sqlcmd @SqlcmdParameters
+[/cc]
+
+If all went well, you should see the following results.
+
+[cc lang="text" escaped="true" nowrap="true" highlight="1)]
+PS PS C:\GitHub\dbt-power-bi-for-sql-dbas> Invoke-Sqlcmd @SqlcmdParameters
+
+Logical Name File Location
+------------ -------------
+tpcc         E:\DATA\tpcc_HammerDB3.3_10.mdf
+tpcc_log     L:\LOG\tpcc_HammerDB3.3_10.ldf
+[/cc]
+
