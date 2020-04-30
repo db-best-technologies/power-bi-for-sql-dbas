@@ -5,7 +5,7 @@ $SqlcmdParameters["Database"] = $Benchmark
 Invoke-Sqlcmd @SqlcmdParameters
 
 $SqlcmdParameters["Username"] = "sa"
-$SqlcmdParameters["Password"] = "Poop"
+$SqlcmdParameters["Password"] = "Top_Secret_Password_To_Use"
 Invoke-Sqlcmd @SqlcmdParameters
 $SqlcmdParameters.Remove("Username")
 $SqlcmdParameters.Remove("Password")
